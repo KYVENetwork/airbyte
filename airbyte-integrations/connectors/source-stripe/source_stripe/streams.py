@@ -12,6 +12,7 @@ import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
 from airbyte_cdk.sources.streams.http import HttpStream
+from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from source_stripe.availability_strategy import StripeSubStreamAvailabilityStrategy
 
 STRIPE_ERROR_CODES: List = [
@@ -26,6 +27,7 @@ class StripeStream(HttpStream, ABC):
     url_base = "https://api.stripe.com/v1/"
     primary_key = "id"
     DEFAULT_SLICE_RANGE = 365
+    transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
 
     def __init__(self, start_date: int, account_id: str, slice_range: int = DEFAULT_SLICE_RANGE, **kwargs):
         super().__init__(**kwargs)
@@ -35,7 +37,7 @@ class StripeStream(HttpStream, ABC):
 
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         decoded_response = response.json()
-        if bool(decoded_response.get("has_more", "False")) and decoded_response.get("data", []):
+        if "has_more" in decoded_response and decoded_response["has_more"] and decoded_response.get("data", []):
             last_object_id = decoded_response["data"][-1]["id"]
             return {"starting_after": last_object_id}
 
@@ -47,10 +49,6 @@ class StripeStream(HttpStream, ABC):
     ) -> MutableMapping[str, Any]:
         # Stripe default pagination is 10, max is 100
         params = {"limit": 100}
-        for key in ("created[gte]", "created[lte]"):
-            if key in stream_slice:
-                params[key] = stream_slice[key]
-
         # Handle pagination by inserting the next page's token in the request parameters
         if next_page_token:
             params.update(next_page_token)
@@ -60,12 +58,46 @@ class StripeStream(HttpStream, ABC):
     def request_headers(self, **kwargs) -> Mapping[str, Any]:
         if self.account_id:
             return {"Stripe-Account": self.account_id}
-
         return {}
 
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
         response_json = response.json()
         yield from response_json.get("data", [])  # Stripe puts records in a container array "data"
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: List[str] = None,
+        stream_slice: Mapping[str, Any] = None,
+        stream_state: Mapping[str, Any] = None,
+    ) -> Iterable[Mapping[str, Any]]:
+        try:
+            yield from super().read_records(sync_mode, cursor_field, stream_slice, stream_state)
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code
+            parsed_error = e.response.json()
+            error_code = parsed_error.get("error", {}).get("code")
+            error_message = parsed_error.get("message")
+            # if the API Key doesn't have required permissions to particular stream, this stream will be skipped
+            if status_code == 403 and error_code in STRIPE_ERROR_CODES:
+                self.logger.warn(f"Stream {self.name} is skipped, due to {error_code}. Full message: {error_message}")
+                pass
+            else:
+                self.logger.error(f"Syncing stream {self.name} is failed, due to {error_code}. Full message: {error_message}")
+
+
+class BasePaginationStripeStream(StripeStream, ABC):
+    def request_params(
+        self,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
+    ) -> MutableMapping[str, Any]:
+        params = super().request_params(stream_state, stream_slice, next_page_token)
+        for key in ("created[gte]", "created[lte]"):
+            if key in stream_slice:
+                params[key] = stream_slice[key]
+        return params
 
     def chunk_dates(self, start_date_ts: int) -> Iterable[Tuple[int, int]]:
         now = pendulum.now().int_timestamp
@@ -92,22 +124,10 @@ class StripeStream(HttpStream, ABC):
         if stream_slice is None:
             return []
 
-        try:
-            yield from super().read_records(sync_mode, cursor_field, stream_slice, stream_state)
-        except requests.exceptions.HTTPError as e:
-            status_code = e.response.status_code
-            parsed_error = e.response.json()
-            error_code = parsed_error.get("error", {}).get("code")
-            error_message = parsed_error.get("message")
-            # if the API Key doesn't have required permissions to particular stream, this stream will be skipped
-            if status_code == 403 and error_code in STRIPE_ERROR_CODES:
-                self.logger.warn(f"Stream {self.name} is skipped, due to {error_code}. Full message: {error_message}")
-                pass
-            else:
-                self.logger.error(f"Syncing stream {self.name} is failed, due to {error_code}. Full message: {error_message}")
+        yield from super().read_records(sync_mode, cursor_field, stream_slice, stream_state)
 
 
-class IncrementalStripeStream(StripeStream, ABC):
+class IncrementalStripeStream(BasePaginationStripeStream, ABC):
     # Stripe returns most recently created objects first, so we don't want to persist state until the entire stream has been read
     state_checkpoint_interval = math.inf
 
@@ -154,6 +174,17 @@ class IncrementalStripeStream(StripeStream, ABC):
         return start_point
 
 
+class Authorizations(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/issuing/authorizations/list
+    """
+
+    cursor_field = "created"
+
+    def path(self, **kwargs) -> str:
+        return "issuing/authorizations"
+
+
 class Customers(IncrementalStripeStream):
     """
     API docs: https://stripe.com/docs/api/customers/list
@@ -178,6 +209,17 @@ class BalanceTransactions(IncrementalStripeStream):
         return "balance_transactions"
 
 
+class Cardholders(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/issuing/cardholders/list
+    """
+
+    cursor_field = "created"
+
+    def path(self, **kwargs) -> str:
+        return "issuing/cardholders"
+
+
 class Charges(IncrementalStripeStream):
     """
     API docs: https://stripe.com/docs/api/charges/list
@@ -189,7 +231,7 @@ class Charges(IncrementalStripeStream):
         return "charges"
 
 
-class CustomerBalanceTransactions(StripeStream):
+class CustomerBalanceTransactions(BasePaginationStripeStream):
     """
     API docs: https://stripe.com/docs/api/customer_balance_transactions/list
     """
@@ -236,6 +278,15 @@ class Disputes(IncrementalStripeStream):
         return "disputes"
 
 
+class EarlyFraudWarnings(StripeStream):
+    """
+    API docs: https://stripe.com/docs/api/radar/early_fraud_warnings/list
+    """
+
+    def path(self, **kwargs):
+        return "radar/early_fraud_warnings"
+
+
 class Events(IncrementalStripeStream):
     """
     API docs: https://stripe.com/docs/api/events/list
@@ -247,7 +298,7 @@ class Events(IncrementalStripeStream):
         return "events"
 
 
-class StripeSubStream(StripeStream, ABC):
+class StripeSubStream(BasePaginationStripeStream, ABC):
     """
     Research shows that records related to SubStream can be extracted from Parent streams which already
     contain 1st page of needed items. Thus, it significantly decreases a number of requests needed to get
@@ -361,6 +412,33 @@ class StripeSubStream(StripeStream, ABC):
             yield item
 
 
+class ApplicationFees(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/application_fees
+    """
+
+    cursor_field = "created"
+
+    def path(self, **kwargs):
+        return "application_fees"
+
+
+class ApplicationFeesRefunds(StripeSubStream):
+    """
+    API docs: https://stripe.com/docs/api/fee_refunds/list
+    """
+
+    name = "application_fees_refunds"
+
+    parent = ApplicationFees
+    parent_id: str = "refund_id"
+    sub_items_attr = "refunds"
+    add_parent_id = True
+
+    def path(self, stream_slice: Mapping[str, Any] = None, **kwargs):
+        return f"application_fees/{stream_slice[self.parent_id]}/refunds"
+
+
 class Invoices(IncrementalStripeStream):
     """
     API docs: https://stripe.com/docs/api/invoices/list
@@ -436,6 +514,17 @@ class Products(IncrementalStripeStream):
 
     def path(self, **kwargs):
         return "products"
+
+
+class Reviews(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/radar/reviews/list
+    """
+
+    cursor_field = "created"
+
+    def path(self, **kwargs):
+        return "reviews"
 
 
 class Subscriptions(IncrementalStripeStream):
@@ -518,6 +607,15 @@ class PaymentIntents(IncrementalStripeStream):
 
     def path(self, **kwargs):
         return "payment_intents"
+
+
+class PaymentMethods(StripeStream):
+    """
+    API docs: https://stripe.com/docs/api/payment_methods/list
+    """
+
+    def path(self, **kwargs):
+        return "payment_methods"
 
 
 class BankAccounts(StripeSubStream):
@@ -648,7 +746,7 @@ class PromotionCodes(IncrementalStripeStream):
         return "promotion_codes"
 
 
-class ExternalAccount(StripeStream, ABC):
+class ExternalAccount(BasePaginationStripeStream, ABC):
     """
     Bank Accounts and Cards are separate streams because they have different schemas
     """
@@ -695,7 +793,7 @@ class SetupIntents(IncrementalStripeStream):
         return "setup_intents"
 
 
-class Accounts(StripeStream):
+class Accounts(BasePaginationStripeStream):
     """
     Docs: https://stripe.com/docs/api/accounts/list
     Even the endpoint allow to filter based on created the data usually don't have this field.
@@ -703,3 +801,50 @@ class Accounts(StripeStream):
 
     def path(self, **kwargs):
         return "accounts"
+
+
+class Cards(IncrementalStripeStream):
+    """
+    Docs: https://stripe.com/docs/api/issuing/cards/list
+    """
+
+    cursor_field = "created"
+
+    def path(self, **kwargs):
+        return "issuing/cards"
+
+
+class TopUps(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/topups/list
+    """
+
+    name = "top_ups"
+    cursor_field = "created"
+
+    def path(self, **kwargs) -> str:
+        return "topups"
+
+
+class Files(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/files/list
+    """
+
+    name = "files"
+    cursor_field = "created"
+
+    def path(self, **kwargs) -> str:
+        return "files"
+
+
+class FileLinks(IncrementalStripeStream):
+    """
+    API docs: https://stripe.com/docs/api/file_links/list
+    """
+
+    name = "file_links"
+    cursor_field = "created"
+
+    def path(self, **kwargs) -> str:
+        return "file_links"

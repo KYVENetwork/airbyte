@@ -7,7 +7,8 @@
 from typing import List
 
 import asyncer
-from ci_connector_ops.pipelines.actions import environments, run_steps, secrets
+from ci_connector_ops.pipelines.helpers.steps import run_steps
+from ci_connector_ops.pipelines.actions import environments, secrets
 from ci_connector_ops.pipelines.bases import Step, StepResult, StepStatus
 from ci_connector_ops.pipelines.builds import LOCAL_BUILD_PLATFORM
 from ci_connector_ops.pipelines.builds.python_connectors import BuildConnectorImage
@@ -56,6 +57,7 @@ class ConnectorPackageInstall(Step):
     """A step to install the Python connector package in a container."""
 
     title = "Connector package install"
+    max_retries = 3
 
     async def _run(self) -> StepResult:
         """Install the connector under test package in a Python container.
@@ -81,9 +83,7 @@ class UnitTests(PytestStep):
         Returns:
             StepResult: Failure or success of the unit tests with stdout and stdout.
         """
-        connector_under_test_with_secrets = connector_under_test.with_directory(
-            f"{self.context.connector.code_directory}/secrets", self.context.secrets_dir
-        )
+        connector_under_test_with_secrets = connector_under_test.with_directory("secrets", self.context.secrets_dir)
         return await self._run_tests_in_directory(connector_under_test_with_secrets, "unit_tests")
 
 
@@ -101,9 +101,8 @@ class IntegrationTests(PytestStep):
         Returns:
             StepResult: Failure or success of the integration tests with stdout and stdout.
         """
-        connector_under_test_with_secrets = connector_under_test.with_directory(
-            f"{self.context.connector.code_directory}/secrets", self.context.secrets_dir
-        )
+        connector_under_test = environments.with_bound_docker_host(self.context, connector_under_test)
+        connector_under_test_with_secrets = connector_under_test.with_directory("secrets", self.context.secrets_dir)
 
         return await self._run_tests_in_directory(connector_under_test_with_secrets, "integration_tests")
 
@@ -135,7 +134,7 @@ async def run_all_tests(context: ConnectorContext) -> List[StepResult]:
     unit_test_results = await UnitTests(context).run(connector_container)
     if unit_test_results.status is StepStatus.FAILURE:
         return step_results + [unit_test_results]
-
+    step_results.append(unit_test_results)
     async with asyncer.create_task_group() as task_group:
         tasks = [
             task_group.soonify(IntegrationTests(context).run)(connector_container),

@@ -19,5 +19,5 @@ You can fetch with one source configuration more than one pool simultaneously. Y
 ## Changelog
 
 | Version | Date | Pull Request | Subject          |
-| :------ | :--- | :----------- | :--------------- |
-| dev     | TBA  | TBA          | KYVE Storage API |
+|:--------| :--- | :----------- | :--------------- |
+| 0.1.0   | 25-05-29  | [26299](https://github.com/airbytehq/airbyte/pull/26299) | Initial release of KYVE source connector|

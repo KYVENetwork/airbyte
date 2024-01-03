@@ -58,6 +58,8 @@ class KYVEStream(HttpStream, IncrementalMixin):
         # this is an ugly solution but has to parsed by source to be a single item
         self._offset = int(config["start_ids"])
 
+        self._start_key = int(config["start_keys"])
+
         self.page_size = config["page_size"]
         self.max_pages = config.get("max_pages", None)
         # For incremental querying
@@ -153,6 +155,12 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 local_hash = hashlib.sha256(response_from_storage_provider.content).hexdigest()
                 assert local_hash == bundle_hash, print("HASHES DO NOT MATCH")
                 decompressed_as_json = json.loads(decompressed)
+
+                if int(bundle.get("to_key")) < self._start_key:
+                    continue
+
+                if int(bundle.get("from:key")) <= self._start_key < int(bundle.get("to_key")):
+                    decompressed_as_json = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) >= self._start_key]
 
                 # Set cursor value to next bundle id
                 self._cursor_value = int(bundle.get("id")) + 1

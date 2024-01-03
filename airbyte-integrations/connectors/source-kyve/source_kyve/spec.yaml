@@ -6,6 +6,7 @@ connectionSpecification:
   required:
     - pool_ids
     - start_ids
+    - start_keys
     - url_base
   properties:
     pool_ids:
@@ -35,12 +36,24 @@ connectionSpecification:
       examples:
         - https://api.kaon.kyve.network/
         - https://api.korellia.kyve.network/
+    start_keys:
+      type: string
+      title: Start keys
+      description:
+        The start key defines, from which key the pipeline should
+        start to extract the data. Only recommended when the sync should 
+        start at a specific key with a predefined Bundle-Start-ID to prevent 
+        inefficiency. (Comma separated)
+      order: 3
+      examples:
+        - "0"
+        - "0,0"
     max_pages:
       type: integer
       description:
         The maximum amount of pages to go trough. Set to 'null' for all
         pages.
-      order: 3
+      order: 4
       airbyte_hidden: true
     page_size:
       type: integer
@@ -48,5 +61,5 @@ connectionSpecification:
         The pagesize for pagination, smaller numbers are used in integration
         tests.
       default: 100
-      order: 4
+      order: 5
       airbyte_hidden: true

@@ -157,15 +157,17 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 decompressed_as_json = json.loads(decompressed)
 
                 if int(bundle.get("to_key")) < self._start_key:
+                    self._cursor_value = int(bundle.get("id")) + 1
                     continue
 
-                if int(bundle.get("from:key")) <= self._start_key < int(bundle.get("to_key")):
+                if int(bundle.get("from_key")) <= self._start_key < int(bundle.get("to_key")):
                     decompressed_as_json = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) >= self._start_key]
 
                 # Set cursor value to next bundle id
                 self._cursor_value = int(bundle.get("id")) + 1
                 # extract the value from the key -> value mapping
                 yield from decompressed_as_json
+            yield from []
 
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         # in case we set a max_pages parameter we need to abort

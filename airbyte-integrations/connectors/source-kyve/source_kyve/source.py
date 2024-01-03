@@ -18,7 +18,7 @@ class SourceKyve(AbstractSource):
         pools = config.get("pool_ids").split(",")
         start_ids = config.get("start_ids").split(",")
 
-        if config.get("start_keys") != "":
+        if config.get("start_keys"):
             start_keys = config.get("start_keys").split(",")
             if not len(pools) == len(start_ids) == len(start_keys):
                 return False, "Please add a start_id and a start_key for every pool"
@@ -44,7 +44,7 @@ class SourceKyve(AbstractSource):
         pools = config.get("pool_ids").split(",")
         start_ids = config.get("start_ids").split(",")
 
-        if config.get("start_keys") != "":
+        if config.get("start_keys"):
             start_keys = config.get("start_keys").split(",")
             for (pool_id, start_id, start_key) in zip(pools, start_ids, start_keys):
                 response = requests.get(f"{config['url_base']}/kyve/query/v1beta1/pool/{pool_id}")

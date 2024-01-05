@@ -47,6 +47,19 @@ connectionSpecification:
         - "0"
         - "0,0"
         - "42000"
+    end_keys:
+      type: string
+      title: End keys
+      description:
+        The end key defines, until which key the pipeline should
+        extract the data. Only recommended when the sync should
+        end at a specific key to prevent unnecessary data traffic. 
+        Right now, this is only supported for pools using the kyvejs/tendermint 
+        or kyvejs/tendermint-bsync runtime. (Comma separated)
+      examples:
+        - "100"
+        - "20,10"
+        - "42300"
     max_pages:
       type: integer
       description:

@@ -8,6 +8,7 @@ config = {
     "start_ids": "0",
     "url_base": "https://api.korellia.kyve.network",
     "start_keys": "0",
+    "end_keys": "9999999999",
     "page_size": 100
 }
 

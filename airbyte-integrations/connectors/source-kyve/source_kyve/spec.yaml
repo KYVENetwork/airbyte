@@ -45,8 +45,8 @@ connectionSpecification:
         kyvejs/tendermint or kyvejs/tendermint-bsync runtime. (Comma separated)
       examples:
         - "0"
+        - "50"
         - "0,0"
-        - "42000"
     end_keys:
       type: string
       title: End keys
@@ -59,7 +59,6 @@ connectionSpecification:
       examples:
         - "100"
         - "20,10"
-        - "42300"
     max_pages:
       type: integer
       description:

@@ -24,8 +24,8 @@ class SourceKyve(AbstractSource):
                 return False, "Please add a start_id and a start_key for every pool"
 
         if config.get("end_keys"):
-            start_keys = config.get("end_keys").split(",")
-            if not len(pools) == len(start_ids) == len(start_keys):
+            end_keys = config.get("end_keys").split(",")
+            if not len(pools) == len(start_ids) == len(end_keys):
                 return False, "Please add a start_id and a end_key for every pool"
 
         if not len(pools) == len(start_ids):
@@ -55,8 +55,8 @@ class SourceKyve(AbstractSource):
 
             config_copy = dict(deepcopy(config))
             config_copy["start_ids"] = int(start_id)
-            config_copy["start_keys"] = -float('inf')
-            config_copy["end_keys"] = float('inf')
+            config_copy["start_keys"] = int(-1e18)
+            config_copy["end_keys"] = int(1e18)
 
             if config.get("start_keys"):
                 config_copy["start_keys"] = int(config.get("start_keys").split(",")[i])

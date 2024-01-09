@@ -74,7 +74,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
         schema = {
             "$schema": "http://json-schema.org/draft-04/schema#",
             "type": "object",
-            "properties": {"key": {"type": "string"}, "value": {"type": "any"}},
+            "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"}},
             "required": ["key", "value"],
         }
 
@@ -167,7 +167,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 if int(bundle.get("from_key")) <= self._start_key <= int(bundle.get("to_key")):
                     decompressed_as_json = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) >= self._start_key]
 
-                if int(bundle.get("from_key")) > self._end_key <= int(bundle.get("to_key")):
+                if int(bundle.get("from_key")) <= self._end_key <= int(bundle.get("to_key")):
                     decompressed_as_json = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) <= self._end_key]
                     self._reached_end = True
 

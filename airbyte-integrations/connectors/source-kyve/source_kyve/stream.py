@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 import math
-import sys
+from pympler import asizeof
 from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
 import requests
@@ -167,12 +167,12 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     data_item["offset"] = bundle.get("id")
 
                     # Get size of data_item in MB
-                    size_of_data_item = sys.getsizeof(data_item) / (1024 * 1024)
+                    size_of_data_item = asizeof.asizeof(data_item) / (1024 * 1024)
 
-                    # Split if data_item > 100MB
-                    if size_of_data_item > 100:
-                        print("Data item with key", data_item["key"], "> than 100MB, start chunking")
-                        chunks_amount = math.ceil(size_of_data_item / 100)
+                    # Split if data_item > 80MB
+                    if size_of_data_item > 80:
+                        print("Data item with key", data_item["key"], "> than 80MB, start chunking")
+                        chunks_amount = math.ceil(size_of_data_item / 80)
                         chunks = split_data_item_in_chunks(data_item, chunks_amount)
                         decompressed_as_json.pop(index)
                         decompressed_as_json.extend(chunks)

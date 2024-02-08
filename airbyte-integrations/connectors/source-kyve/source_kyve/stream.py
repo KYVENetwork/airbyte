@@ -6,12 +6,13 @@ import hashlib
 import json
 import logging
 import math
+from pympler import asizeof
 from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
 import requests
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
-from source_kyve.utils import query_endpoint, split_data_item_in_chunks, estimate_size
+from source_kyve.utils import query_endpoint, split_data_item_in_chunks
 
 logger = logging.getLogger("airbyte")
 
@@ -166,7 +167,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     data_item["offset"] = bundle.get("id")
 
                     # Get size of data_item in MB
-                    size_of_data_item = estimate_size(data_item) / (1024 * 1024)
+                    size_of_data_item = asizeof.asizeof(data_item) / (1024 * 1024)
 
                     # Split if data_item > 80MB
                     if size_of_data_item > 80:

@@ -3,20 +3,7 @@
 #
 import math
 import requests
-import sys
 import textwrap
-
-
-def estimate_size(obj):
-    size = sys.getsizeof(obj)
-    if hasattr(obj, '__iter__'):
-        if hasattr(obj, 'items'):
-            # For dictionaries
-            size += sum(estimate_size(v) for v in obj.items())
-        elif not isinstance(obj, str):
-            # For lists, sets, tuples
-            size += sum(estimate_size(i) for i in obj)
-    return size
 
 
 def query_endpoint(endpoint):

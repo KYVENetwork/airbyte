@@ -58,7 +58,7 @@ def transform_bundle(decompressed_as_json, bundle_id, max_MB):
         size_of_data_item = bytes_to_mb(data_item_in_bytes)
 
         # Split if data_item > 80MB
-        if size_of_data_item > 80:
+        if size_of_data_item > max_MB:
             print("Data item with key", data_item["key"], "> than 80MB, start chunking")
             chunks_amount = math.ceil(size_of_data_item / 80)
             chunks = split_data_item_in_chunks(data_item, chunks_amount)
@@ -66,3 +66,5 @@ def transform_bundle(decompressed_as_json, bundle_id, max_MB):
             for i, chunk in enumerate(chunks):
                 decompressed_as_json.insert(index + i, chunk)
             print("Chunked successfully")
+
+    return decompressed_as_json

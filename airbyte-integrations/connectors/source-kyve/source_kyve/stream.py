@@ -175,7 +175,8 @@ class KYVEStream(HttpStream, IncrementalMixin):
                         chunks_amount = math.ceil(size_of_data_item / 80)
                         chunks = split_data_item_in_chunks(data_item, chunks_amount)
                         decompressed_as_json.pop(index)
-                        decompressed_as_json.extend(chunks)
+                        for i, chunk in enumerate(chunks):
+                            decompressed_as_json.insert(index + i, chunk)
                         print("Chunked successfully")
 
                 # Skip bundle if start_key not reached

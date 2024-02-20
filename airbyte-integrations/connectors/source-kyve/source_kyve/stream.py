@@ -74,7 +74,8 @@ class KYVEStream(HttpStream, IncrementalMixin):
         schema = {
             "$schema": "http://json-schema.org/draft-04/schema#",
             "type": "object",
-            "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"}, "chunk_index": {"type": "number"}},
+            "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"},
+                           "chunk_index": {"type": "number"}},
             "required": ["key", "value"],
         }
 
@@ -160,6 +161,8 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 assert local_hash == bundle_hash, print("HASHES DO NOT MATCH")
                 decompressed_as_json = json.loads(decompressed)
 
+                transformed_bundle = transform_bundle(decompressed_as_json, bundle.get("id"), 80)
+
                 # Skip bundle if start_key not reached
                 if int(bundle.get("to_key")) < self._start_key:
                     self._cursor_value = int(bundle.get("id")) + 1
@@ -168,16 +171,16 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 # If start_key reached, remove all data items of bundles that have a key
                 # smaller than start_key
                 if int(bundle.get("from_key")) <= self._start_key <= int(bundle.get("to_key")):
-                    sliced = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) >= self._start_key]
-                    yield from transform_bundle(sliced, bundle.get("id"), 80)
+                    sliced = [data_item for data_item in transformed_bundle if int(data_item.get("key")) >= self._start_key]
+                    yield from sliced
                     continue
 
                 # If end_key reached, remove all data items of bundles that have a key
                 # bigger than end_key and stop the stream
                 if int(bundle.get("from_key")) <= self._end_key <= int(bundle.get("to_key")):
-                    sliced = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) <= self._end_key]
+                    sliced = [data_item for data_item in transformed_bundle if int(data_item.get("key")) <= self._end_key]
                     self._reached_end = True
-                    yield from transform_bundle(sliced, bundle.get("id"), 80)
+                    yield from sliced
                     return
 
                 # If end_key already reached, stop stream without syncing anything
@@ -186,7 +189,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     return
 
                 # extract the value from the key -> value mapping
-                yield from transform_bundle(decompressed_as_json, bundle.get("id"), 80)
+                yield from transformed_bundle
                 # Set cursor value to next bundle id
                 self._cursor_value = int(bundle.get("id")) + 1
 

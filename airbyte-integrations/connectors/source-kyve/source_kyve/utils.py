@@ -40,7 +40,7 @@ def split_data_item_in_chunks(data_item, chunk_amount):
 
     res = []
     for index, chunk in enumerate(chunks):
-        res.append({"key": data_item["key"] + "_" + index, "value": chunk, "offset": data_item["offset"],
+        res.append({"key": data_item["key"], "value": chunk, "offset": data_item["offset"],
                     "chunk_index": index})
 
     return res

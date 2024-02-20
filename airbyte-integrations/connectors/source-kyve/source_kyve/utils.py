@@ -47,8 +47,9 @@ def split_data_item_in_chunks(data_item, chunk_amount):
 
 
 def transform_bundle(decompressed_as_json, bundle_id, max_MB):
-    # Add offset to each_data_item
-    for index, data_item in enumerate(decompressed_as_json):
+    transformed_data = []
+
+    for data_item in decompressed_as_json:
         # Add offset
         data_item["offset"] = bundle_id
 
@@ -56,14 +57,17 @@ def transform_bundle(decompressed_as_json, bundle_id, max_MB):
         data_item_in_bytes = object_to_bytes(data_item)
         size_of_data_item = bytes_to_mb(data_item_in_bytes)
 
-        # Split if data_item > 80MB
+        # Split if data_item > max_MB
         if size_of_data_item > max_MB:
-            print("Data item with key", data_item["key"], "> than 80MB, start chunking")
+            print("Data item with key", data_item["key"], "is larger than", max_MB, "MB, start chunking")
             chunks_amount = math.ceil(size_of_data_item / max_MB)
             chunks = split_data_item_in_chunks(data_item, chunks_amount)
-            decompressed_as_json.pop(index)
-            for i, chunk in enumerate(chunks):
-                decompressed_as_json.insert(index + i, chunk)
             print("Chunked successfully")
 
-    return decompressed_as_json
+            # Add each chunk to transformed_data
+            for chunk in chunks:
+                transformed_data.append(chunk)
+        else:
+            transformed_data.append(data_item)
+
+    return transformed_data

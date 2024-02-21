@@ -7,12 +7,12 @@ import textwrap
 import sys
 
 
-def sizeof(string):
+def sizeof(string) -> int:
     encoded_string = string.encode('utf-8')
     size_in_bytes = sys.getsizeof(encoded_string)
     size_in_mb = size_in_bytes / (1024 * 1024)
 
-    return size_in_mb
+    return math.ceil(size_in_mb)
 
 
 def query_endpoint(endpoint):

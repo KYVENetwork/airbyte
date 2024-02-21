@@ -4,26 +4,15 @@
 import math
 import requests
 import textwrap
+import sys
 
 
-def bytes_to_mb(bytes_data):
-    size_in_mb = len(bytes_data) / (1024 * 1024)
+def sizeof(string):
+    encoded_string = string.encode('utf-8')
+    size_in_bytes = sys.getsizeof(encoded_string)
+    size_in_mb = size_in_bytes / (1024 * 1024)
 
     return size_in_mb
-
-
-def object_to_bytes(obj):
-    str_obj = str(obj)
-    bytes_data = str_obj.encode('utf-8')
-
-    return bytes_data
-
-
-def size_of_object(obj):
-    # Get and return size of data_item in MB
-    data_item_in_bytes = object_to_bytes(obj)
-
-    return bytes_to_mb(data_item_in_bytes)
 
 
 def query_endpoint(endpoint):

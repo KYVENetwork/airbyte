@@ -6,6 +6,19 @@ import requests
 import textwrap
 
 
+def bytes_to_mb(bytes_data):
+    size_in_mb = len(bytes_data) / (1024 * 1024)
+
+    return size_in_mb
+
+
+def object_to_bytes(obj):
+    str_obj = str(obj)
+    bytes_data = str_obj.encode('utf-8')
+
+    return bytes_data
+
+
 def query_endpoint(endpoint):
     try:
         if not (endpoint.startswith("https://") or endpoint.startswith("http://")):

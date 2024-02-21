@@ -19,6 +19,13 @@ def object_to_bytes(obj):
     return bytes_data
 
 
+def size_of_object(obj):
+    # Get and return size of data_item in MB
+    data_item_in_bytes = object_to_bytes(obj)
+
+    return bytes_to_mb(data_item_in_bytes)
+
+
 def query_endpoint(endpoint):
     try:
         if not (endpoint.startswith("https://") or endpoint.startswith("http://")):

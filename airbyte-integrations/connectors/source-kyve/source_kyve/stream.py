@@ -11,7 +11,7 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional
 import requests
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
-from source_kyve.utils import bytes_to_mb, object_to_bytes, query_endpoint, split_data_item_in_chunks
+from source_kyve.utils import bytes_to_mb, object_to_bytes, query_endpoint, size_of_object, split_data_item_in_chunks
 
 logger = logging.getLogger("airbyte")
 
@@ -166,12 +166,11 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     data_item["offset"] = bundle.get("id")
 
                     # Get size of data_item in MB
-                    data_item_in_bytes = object_to_bytes(data_item)
-                    size_of_data_item = bytes_to_mb(data_item_in_bytes)
+                    size_of_data_item = size_of_object(data_item)
 
                     # Split if data_item > 80MB
                     if size_of_data_item > 80:
-                        print("Data item with key", data_item["key"], "> than 80MB, start chunking")
+                        print("Data item with key", data_item["key"], "> than 80MB with ", size_of_data_item, "MB; start chunking")
                         chunks_amount = math.ceil(size_of_data_item / 80)
                         chunks = split_data_item_in_chunks(data_item, chunks_amount)
                         decompressed_as_json.pop(index)
@@ -186,14 +185,16 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 # If start_key reached, remove all data items of bundles that have a key
                 # smaller than start_key
                 if int(bundle.get("from_key")) <= self._start_key <= int(bundle.get("to_key")):
-                    decompressed_as_json = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) >= self._start_key]
+                    decompressed_as_json = [data_item for data_item in decompressed_as_json if self._start_key <= int(data_item.get("key"))
+                                            <= self._end_key]
                     yield from decompressed_as_json
                     continue
 
                 # If end_key reached, remove all data items of bundles that have a key
                 # bigger than end_key and stop the stream
                 if int(bundle.get("from_key")) <= self._end_key <= int(bundle.get("to_key")):
-                    decompressed_as_json = [data_item for data_item in decompressed_as_json if int(data_item.get("key")) <= self._end_key]
+                    decompressed_as_json = [data_item for data_item in decompressed_as_json if self._start_key <= int(data_item.get("key"))
+                                            <= self._end_key]
                     self._reached_end = True
                     yield from decompressed_as_json
                     return

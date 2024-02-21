@@ -11,6 +11,7 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional
 import requests
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
+from copy import deepcopy
 from source_kyve.utils import bytes_to_mb, object_to_bytes, query_endpoint, size_of_object, split_data_item_in_chunks
 
 logger = logging.getLogger("airbyte")
@@ -166,13 +167,13 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     data_item["offset"] = bundle.get("id")
 
                     # Get size of data_item in MB
-                    size_of_data_item = size_of_object(data_item)
+                    size_of_data_item = size_of_object(deepcopy(data_item))
 
                     # Split if data_item > 80MB
                     if size_of_data_item > 80:
                         print("Data item with key", data_item["key"], "> than 80MB with ", size_of_data_item, "MB; start chunking")
                         chunks_amount = math.ceil(size_of_data_item / 80)
-                        chunks = split_data_item_in_chunks(data_item, chunks_amount)
+                        chunks = split_data_item_in_chunks(deepcopy(data_item), chunks_amount)
                         decompressed_as_json.pop(index)
                         decompressed_as_json.extend(chunks)
                         print("Chunked successfully")

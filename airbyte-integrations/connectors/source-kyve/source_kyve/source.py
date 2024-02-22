@@ -17,6 +17,7 @@ class SourceKyve(AbstractSource):
         # check that pools and bundles are the same length
         pools = config.get("pool_ids").split(",")
         start_ids = config.get("start_ids").split(",")
+        data_item_size_limit = config.get("data_item_size_limit")
 
         if config.get("start_keys"):
             start_keys = config.get("start_keys").split(",")
@@ -31,7 +32,7 @@ class SourceKyve(AbstractSource):
         if not len(pools) == len(start_ids):
             return False, "Please add a start_id for every pool"
 
-        if config.get("data_item_size_limit") < 10:
+        if data_item_size_limit < 10 and data_item_size_limit != 0:
             return False, "Data item size limit needs to be greater than or equal to 10MB"
 
         for pool_id in pools:

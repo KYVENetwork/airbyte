@@ -31,6 +31,9 @@ class SourceKyve(AbstractSource):
         if not len(pools) == len(start_ids):
             return False, "Please add a start_id for every pool"
 
+        if config.get("data_item_size_limit") < 10:
+            return False, "Data item size limit needs to be greater than or equal to 10MB"
+
         for pool_id in pools:
             try:
                 # check if endpoint is available and returns valid data
@@ -57,12 +60,16 @@ class SourceKyve(AbstractSource):
             config_copy["start_ids"] = int(start_id)
             config_copy["start_keys"] = int(-1e18)
             config_copy["end_keys"] = int(1e18)
+            config_copy["data_item_size_limit"] = 0
 
             if config.get("start_keys"):
                 config_copy["start_keys"] = int(config.get("start_keys").split(",")[i])
 
             if config.get("end_keys"):
                 config_copy["end_keys"] = int(config.get("end_keys").split(",")[i])
+
+            if config.get("data_item_size_limit"):
+                config_copy["data_item_size_limit"] = int(config.get("data_item_size_limit"))
 
             streams.append(KYVEStream(config=config_copy, pool_data=pool_data))
 

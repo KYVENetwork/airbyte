@@ -77,7 +77,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
         schema = {
             "$schema": "http://json-schema.org/draft-04/schema#",
             "type": "object",
-            "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"}, "chunk_index": {"type": "number"}},
+            "properties": {"key": {"type": "string"}, "value": {"type": "string"}, "offset": {"type": "string"}, "chunk_index": {"type": "number"}},
             "required": ["key", "value"],
         }
 
@@ -167,6 +167,8 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 for index, data_item in enumerate(decompressed_as_json):
                     # Add offset and gt100
                     data_item["offset"] = bundle.get("id")
+
+                    data_item["value"] = str(data_item["value"])
 
                     if self._data_item_size_limit > 0:
                         # Get size of data_item in MB

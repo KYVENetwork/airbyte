@@ -7,9 +7,8 @@ def preprocess_tendermint_data_item(data_item):
 
     data_item["height"] = height
 
-    preprocessed_data_item = []
+    preprocessed_data_item = [data_item]
 
-    preprocessed_data_item.extend(data_item)
     preprocessed_data_item.extend(get_event_rows(begin_block_events, height, data_item["offset"]))
     preprocessed_data_item.extend(get_event_rows(end_block_events, height, data_item["offset"]))
     preprocessed_data_item.extend(get_event_rows(txs_results, height, data_item["offset"]))

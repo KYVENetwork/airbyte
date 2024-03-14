@@ -5,14 +5,12 @@ import gzip
 import hashlib
 import json
 import logging
-import math
-import sys
 from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
 import requests
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
-from source_kyve.utils import query_endpoint, split_data_item_in_chunks
+from source_kyve.utils import query_endpoint
 from source_kyve.preprocessor import preprocess_tendermint_data_item
 
 logger = logging.getLogger("airbyte")
@@ -62,8 +60,6 @@ class KYVEStream(HttpStream, IncrementalMixin):
 
         self._start_key = int(config["start_keys"])
         self._end_key = int(config["end_keys"])
-
-        self._data_item_size_limit = config["data_item_size_limit"]
 
         self._tendermint_normalization = config["tendermint_normalization"]
 
@@ -188,20 +184,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
                         preprocessed_data_item = preprocess_tendermint_data_item(data_item)
                         for row in preprocessed_data_item:
                             preprocessed_bundle.append(row)
-
-                    if self._data_item_size_limit > 0:
-                        # Get size of data_item in MB
-                        size_of_data_item = sys.getsizeof(str(data_item)) / (1000 * 1000)
-
-                        # Split if data_item > 80MB
-                        if size_of_data_item > self._data_item_size_limit:
-                            print("Data item with key", data_item["key"], "> than", self._data_item_size_limit, "MB with ",
-                                  size_of_data_item, "MB; start chunking")
-                            chunks_amount = math.ceil(size_of_data_item / (self._data_item_size_limit / 20))
-                            chunks = split_data_item_in_chunks(data_item, chunks_amount)
-                            decompressed_as_json.pop(index)
-                            decompressed_as_json.extend(chunks)
-                            print("Chunked successfully")
+                            preprocessed_bundle.append(row)
 
                 # Skip bundle if start_key not reached
                 if int(bundle.get("to_key")) < self._start_key:

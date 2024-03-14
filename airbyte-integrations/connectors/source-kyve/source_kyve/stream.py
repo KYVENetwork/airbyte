@@ -13,6 +13,7 @@ import requests
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
 from source_kyve.utils import query_endpoint, split_data_item_in_chunks
+from source_kyve.preprocessor import preprocess_tendermint_data_item
 
 logger = logging.getLogger("airbyte")
 
@@ -64,6 +65,8 @@ class KYVEStream(HttpStream, IncrementalMixin):
 
         self._data_item_size_limit = config["data_item_size_limit"]
 
+        self._tendermint_normalization = config["tendermint_normalization"]
+
         self._reached_end = False
 
         self.page_size = 100
@@ -73,13 +76,24 @@ class KYVEStream(HttpStream, IncrementalMixin):
         self._cursor_value = self._offset
 
     def get_json_schema(self) -> Mapping[str, Any]:
-        # This is KYVE's default schema and won't be changed.
-        schema = {
-            "$schema": "http://json-schema.org/draft-04/schema#",
-            "type": "object",
-            "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"}, "chunk_index": {"type": "number"}},
-            "required": ["key", "value"],
-        }
+        if self._tendermint_normalization:
+            # This is KYVE's default schema and won't be changed.
+            schema = {
+                "$schema": "http://json-schema.org/draft-04/schema#",
+                "type": "object",
+                "properties": {"height": {"type": "integer"}, "value": {"type": "any"}, "type": {"type": "string"}, "arr_idx":
+                    {"type": "integer"}, "offset": {"type": "string"}},
+                "required": ["key", "value"],
+            }
+        else:
+            # This is KYVE's default schema and won't be changed.
+            schema = {
+                "$schema": "http://json-schema.org/draft-04/schema#",
+                "type": "object",
+                "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"},
+                               "chunk_index": {"type": "number"}},
+                "required": ["key", "value"],
+            }
 
         return schema
 
@@ -168,9 +182,17 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     # Add offset and gt100
                     data_item["offset"] = bundle.get("id")
 
+                    preprocessed_bundle = []
+
+                    if self._tendermint_normalization:
+                        preprocessed_data_item = preprocess_tendermint_data_item(data_item)
+                        decompressed_as_json.pop(index)
+                        for row in preprocessed_data_item:
+                            preprocessed_bundle.extend(row)
+
                     if self._data_item_size_limit > 0:
                         # Get size of data_item in MB
-                        size_of_data_item = sys.getsizeof(str(data_item)) / (1000*1000)
+                        size_of_data_item = sys.getsizeof(str(data_item)) / (1000 * 1000)
 
                         # Split if data_item > 80MB
                         if size_of_data_item > self._data_item_size_limit:
@@ -190,18 +212,32 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 # If start_key reached, remove all data items of bundles that have a key
                 # smaller than start_key
                 if int(bundle.get("from_key")) <= self._start_key <= int(bundle.get("to_key")):
-                    decompressed_as_json = [data_item for data_item in decompressed_as_json if self._start_key <= int(data_item.get("key"))
-                                            <= self._end_key]
-                    yield from decompressed_as_json
+                    if self._tendermint_normalization:
+                        sliced_preprocessed_bundle = [row for row in preprocessed_bundle if self._start_key <= row.get("height")
+                                                      <= self._end_key]
+                        yield from sliced_preprocessed_bundle
+                    else:
+                        decompressed_as_json = [data_item for data_item in decompressed_as_json if
+                                                self._start_key <= int(data_item.get("key"))
+                                                <= self._end_key]
+                        yield from decompressed_as_json
                     continue
 
                 # If end_key reached, remove all data items of bundles that have a key
                 # bigger than end_key and stop the stream
                 if int(bundle.get("from_key")) <= self._end_key <= int(bundle.get("to_key")):
-                    decompressed_as_json = [data_item for data_item in decompressed_as_json if self._start_key <= int(data_item.get("key"))
-                                            <= self._end_key]
-                    self._reached_end = True
-                    yield from decompressed_as_json
+                    if self._tendermint_normalization:
+                        sliced_preprocessed_bundle = [row for row in preprocessed_bundle if
+                                                      self._start_key <= row.get("height")
+                                                      <= self._end_key]
+                        self._reached_end = True
+                        yield from sliced_preprocessed_bundle
+                    else:
+                        decompressed_as_json = [data_item for data_item in decompressed_as_json if
+                                                self._start_key <= int(data_item.get("key"))
+                                                <= self._end_key]
+                        self._reached_end = True
+                        yield from decompressed_as_json
                     return
 
                 # If end_key already reached, stop stream without syncing anything
@@ -209,8 +245,10 @@ class KYVEStream(HttpStream, IncrementalMixin):
                     self._reached_end = True
                     return
 
-                # extract the value from the key -> value mapping
-                yield from decompressed_as_json
+                if self._tendermint_normalization:
+                    yield from preprocessed_bundle
+                else:
+                    yield from decompressed_as_json
                 # Set cursor value to next bundle id
                 self._cursor_value = int(bundle.get("id")) + 1
 

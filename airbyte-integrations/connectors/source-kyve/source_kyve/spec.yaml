@@ -73,6 +73,13 @@ connectionSpecification:
       examples:
         - "100"
         - "50"
+    enable_tendermint_normalization:
+      type: boolean
+      title: Enable Tendermint normalization
+      default: false
+      description:
+        Normalizes block results object and writes each event of begin_block_events, end_block_events 
+        and txs_results in one row.
     max_pages:
       type: integer
       description:

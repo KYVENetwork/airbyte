@@ -19,13 +19,14 @@ def preprocess_tendermint_data_item(data_item):
 
 def get_event_rows(events, height, offset):
     event_rows = []
-    for index, event in enumerate(events):
-        event_rows.extend({
-            "height": height,
-            "value": event,
-            "type": "txs_result",
-            "arr_idx": index,
-            "offset": offset
-        })
+    if events is not None:
+        for index, event in enumerate(events):
+            event_rows.extend({
+                "height": height,
+                "value": event,
+                "type": "txs_result",
+                "arr_idx": index,
+                "offset": offset
+            })
 
     return event_rows

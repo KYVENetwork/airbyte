@@ -12,14 +12,14 @@ def preprocess_tendermint_data_item(data_item):
 
     preprocessed_data_item = [data_item]
 
-    preprocessed_data_item.extend(get_event_rows(begin_block_events, height, data_item["offset"]))
-    preprocessed_data_item.extend(get_event_rows(end_block_events, height, data_item["offset"]))
-    preprocessed_data_item.extend(get_event_rows(txs_results, height, data_item["offset"]))
+    preprocessed_data_item.extend(get_event_rows(begin_block_events, height, data_item["offset"], "begin_block_event"))
+    preprocessed_data_item.extend(get_event_rows(end_block_events, height, data_item["offset"], "end_block_event"))
+    preprocessed_data_item.extend(get_event_rows(txs_results, height, data_item["offset"], "tx_result"))
 
     return preprocessed_data_item
 
 
-def get_event_rows(events, height, offset):
+def get_event_rows(events, height, offset, type):
     event_rows = []
     if events is not None:
         for index, event in enumerate(events):
@@ -30,7 +30,7 @@ def get_event_rows(events, height, offset):
                     "height": height,
                     "value": event_json,
                     "type": "txs_result",
-                    "arr_idx": index,
+                    "array_index": index,
                     "offset": offset
                 }
             )))

@@ -177,16 +177,15 @@ class KYVEStream(HttpStream, IncrementalMixin):
                 assert local_hash == bundle_hash, print("HASHES DO NOT MATCH")
                 decompressed_as_json = json.loads(decompressed)
 
+                preprocessed_bundle = []
+
                 # Add offset to each_data_item
                 for index, data_item in enumerate(decompressed_as_json):
                     # Add offset and gt100
                     data_item["offset"] = bundle.get("id")
 
-                    preprocessed_bundle = []
-
                     if self._tendermint_normalization:
                         preprocessed_data_item = preprocess_tendermint_data_item(data_item)
-                        decompressed_as_json.pop(index)
                         for row in preprocessed_data_item:
                             preprocessed_bundle.append(row)
 

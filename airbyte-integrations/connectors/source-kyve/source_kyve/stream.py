@@ -188,7 +188,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
                         preprocessed_data_item = preprocess_tendermint_data_item(data_item)
                         decompressed_as_json.pop(index)
                         for row in preprocessed_data_item:
-                            preprocessed_bundle.extend(row)
+                            preprocessed_bundle.append(row)
 
                     if self._data_item_size_limit > 0:
                         # Get size of data_item in MB

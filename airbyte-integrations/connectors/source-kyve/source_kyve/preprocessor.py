@@ -1,3 +1,6 @@
+import json
+
+
 def preprocess_tendermint_data_item(data_item):
     begin_block_events = data_item["value"]["block_results"].pop("begin_block_events")
     end_block_events = data_item["value"]["block_results"].pop("end_block_events")
@@ -20,12 +23,16 @@ def get_event_rows(events, height, offset):
     event_rows = []
     if events is not None:
         for index, event in enumerate(events):
-            event_rows.append({
-                "height": height,
-                "value": event,
-                "type": "txs_result",
-                "arr_idx": index,
-                "offset": offset
-            })
+            # Convert event to JSON-serializable format
+            event_json = json.loads(json.dumps(event))
+            event_rows.append(json.loads(json.dumps(
+                {
+                    "height": height,
+                    "value": event_json,
+                    "type": "txs_result",
+                    "arr_idx": index,
+                    "offset": offset
+                }
+            )))
 
     return event_rows

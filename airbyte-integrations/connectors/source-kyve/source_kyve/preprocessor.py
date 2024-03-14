@@ -29,7 +29,7 @@ def get_event_rows(events, height, offset, type):
                 {
                     "height": height,
                     "value": event_json,
-                    "type": "txs_result",
+                    "type": type,
                     "array_index": index,
                     "offset": offset
                 }

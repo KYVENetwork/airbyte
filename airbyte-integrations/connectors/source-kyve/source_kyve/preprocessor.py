@@ -20,7 +20,7 @@ def get_event_rows(events, height, offset):
     event_rows = []
     if events is not None:
         for index, event in enumerate(events):
-            event_rows.extend({
+            event_rows.append({
                 "height": height,
                 "value": event,
                 "type": "txs_result",

@@ -5,12 +5,13 @@ import gzip
 import hashlib
 import json
 import logging
+import time
 from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
 import requests
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
-from source_kyve.utils import query_endpoint
+from source_kyve.utils import query_endpoint_in_gateway_endpoints
 from source_kyve.preprocessor import preprocess_tendermint_data_item
 
 logger = logging.getLogger("airbyte")
@@ -86,8 +87,7 @@ class KYVEStream(HttpStream, IncrementalMixin):
             schema = {
                 "$schema": "http://json-schema.org/draft-04/schema#",
                 "type": "object",
-                "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"},
-                               "chunk_index": {"type": "number"}},
+                "properties": {"key": {"type": "string"}, "value": {"type": "any"}, "offset": {"type": "string"}},
                 "required": ["key", "value"],
             }
 
@@ -143,21 +143,29 @@ class KYVEStream(HttpStream, IncrementalMixin):
 
                 # If storage_provider provides gateway_endpoints, query endpoint - otherwise stop syncing.
                 if gateway_endpoints is not None:
-                    # Try to query each endpoint in the given order and break loop if query was successful
-                    # If no endpoint is successful, skip the bundle
-                    for endpoint in gateway_endpoints:
-                        response_from_storage_provider = query_endpoint(f"{endpoint}{storage_id}")
+                    # Query bundle from storage provider gateway endpoints with exponential backoff
+                    max_retries = 10
+                    retry_count = 0
+                    while retry_count < max_retries:
+                        response_from_storage_provider = query_endpoint_in_gateway_endpoints(gateway_endpoints, storage_id, logger)
+
                         if response_from_storage_provider is not None:
-                            break
+                            if response_from_storage_provider.ok:
+                                break
+                        else:
+                            logger.error(f"couldn't query any endpoint successfully with storage_id {storage_id}")
+                            logger.info(f"retrying in {2 ^ (retry_count + 1)} seconds")
+                            retry_count = retry_count + 1
+
+                            time.sleep(2 ^ retry_count)
                     else:
-                        logger.error(f"couldn't query any endpoint successfully with storage_id {storage_id}; skipping bundle...")
-                        continue
+                        raise Exception(f"failed to query bundle {bundle.get('id')} with storage_id = {storage_id} from storage_provider "
+                                        f"{storage_provider_id}")
                 else:
                     logger.error(f"storage provider with id {storage_provider_id} is not supported ")
                     raise Exception("unsupported storage provider")
 
                 if not response_from_storage_provider.ok:
-                    # TODO: add fallback to different storage provider in case resource is unavailable
                     logger.error(f"Reading bundle {storage_id} with status code {response.status_code}")
 
                 try:
